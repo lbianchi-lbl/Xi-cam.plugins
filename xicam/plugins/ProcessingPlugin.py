@@ -48,9 +48,12 @@ class ProcessingPlugin(IPlugin):
         self._outputs = getattr(self, '_outputs', None)
         self._inverted_vars = None
         self.name = getattr(self, 'name', self.__class__.__name__)
-        self._workflow = None
+        self.update_callback = []
         if not hasattr(self, 'hints'): self.hints = []
         for hint in self.hints: hint.parent = self
+
+    def attach(self, cb):
+        self.update_callback.append(cb)
 
     def evaluate(self):
         raise NotImplementedError
@@ -124,7 +127,8 @@ class ProcessingPlugin(IPlugin):
         else:
             self.inputs[name].value = self.inputs[name].default
 
-        self._workflow.update()
+        for cb in self.update_callback:
+            cb(name, param, value)
 
     def clearConnections(self):
         for input in self.inputs.values():
@@ -133,7 +137,7 @@ class ProcessingPlugin(IPlugin):
     def __reduce__(self):
         d = self.__dict__.copy()
         if '_param' in d: del d['_param']
-        if '_workflow' in d: del d['_workflow']
+        if 'update_callback' in d: del d['update_callback']
         return _ProcessingPluginRetriever(), (self.__class__.__name__, d)
 
 
