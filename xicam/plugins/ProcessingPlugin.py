@@ -274,7 +274,6 @@ class Input(Var):
             self._param.setValue(v)
 
 
-
 class Output(Var):
     def __init__(self, name='', description='', type=None, units=None, *args, **kwargs):
         super().__init__()
@@ -283,6 +282,30 @@ class Output(Var):
         self.units = units
         self.value = None
         self.type = type
+        self.client_callbacks = []
+        self.server_callback = None
+        self.visualize = False # Any update | Final update? or just Final update?
+        self.queue = None
+        self.tag = None
+
+    def __setattr__(self, name, value):
+        if hasattr(self, "visualize") and self.visualize is True:
+            if name == "value" and self.queue is not None:  # value is getting set
+                import cloudpickle
+                cp = cloudpickle.dumps(value)
+                self.queue.put((self.tag, cp))
+
+        super().__setattr__(name, value)
+
+    def add_client_callback(self, cb):
+        self.client_callbacks.append(cb)
+
+    def set_server_callback(self, cb):
+        if self.server_callback is not None:
+            raise Exception("server callback already set by another object, only one can exist...")
+
+        self.server_callback = cb
+
 
 class InOut(Input, Output):
     pass
