@@ -115,6 +115,15 @@ class ProcessingPlugin(IPlugin):
                     children.append(childparam)
                     input._param = childparam
 
+            for name, output in self.outputs.items():
+                visparam = Parameter.create(name=name + " (out)",
+                                              value=False,
+                                              values=[True, False],
+                                              default=False,
+                                              type='bool')
+                children.append(visparam)
+                visparam.sigValueChanged.connect(partial(self.setParameterValue, "__visualize__"))
+
             self._param = Parameter(name=getattr(self, 'name', self.__class__.__name__), children=children,
                                     type='group')
 
@@ -122,10 +131,11 @@ class ProcessingPlugin(IPlugin):
         return self._param
 
     def setParameterValue(self, name, param, value):
-        if value is not None:
-            self.inputs[name].value = value
-        else:
-            self.inputs[name].value = self.inputs[name].default
+        if name not in "__visualize__":
+            if value is not None:
+                self.inputs[name].value = value
+            else:
+                self.inputs[name].value = self.inputs[name].default
 
         for cb in self.update_callback:
             cb(name, param, value)
