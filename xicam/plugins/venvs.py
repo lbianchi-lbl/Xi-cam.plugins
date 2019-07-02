@@ -157,8 +157,94 @@ def activate_this(path):
         site_packages = os.path.join(base, 'lib', 'python%s' % sys.version[:3], 'site-packages')
     prev_sys_path = list(sys.path)
     # if not getattr(sys, 'frozen', False):  # site missing addsitedir when frozen
-    import site
-    site.addsitedir(site_packages)
+    try:
+        import site
+        addsitedir = site.addsitedir
+    except AttributeError:  # frozen apps have no site-packages; and thus their site.py is fake
+        # NOTE: relevant methods have been extracted from a real site.py
+        def makepath(*paths):
+            dir = os.path.join(*paths)
+            try:
+                dir = os.path.abspath(dir)
+            except OSError:
+                pass
+            return dir, os.path.normcase(dir)
+        def _init_pathinfo():
+            """Return a set containing all existing file system items from sys.path."""
+            d = set()
+            for item in sys.path:
+                try:
+                    if os.path.exists(item):
+                        _, itemcase = makepath(item)
+                        d.add(itemcase)
+                except TypeError:
+                    continue
+            return d
+
+        def addpackage(sitedir, name, known_paths):
+            """Process a .pth file within the site-packages directory:
+               For each line in the file, either combine it with sitedir to a path
+               and add that to known_paths, or execute it if it starts with 'import '.
+            """
+            if known_paths is None:
+                known_paths = _init_pathinfo()
+                reset = True
+            else:
+                reset = False
+            fullname = os.path.join(sitedir, name)
+            try:
+                f = open(fullname, "r")
+            except OSError:
+                return
+            with f:
+                for n, line in enumerate(f):
+                    if line.startswith("#"):
+                        continue
+                    try:
+                        if line.startswith(("import ", "import\t")):
+                            exec(line)
+                            continue
+                        line = line.rstrip()
+                        dir, dircase = makepath(sitedir, line)
+                        if not dircase in known_paths and os.path.exists(dir):
+                            sys.path.append(dir)
+                            known_paths.add(dircase)
+                    except Exception:
+                        print("Error processing line {:d} of {}:\n".format(n + 1, fullname),
+                              file=sys.stderr)
+                        import traceback
+                        for record in traceback.format_exception(*sys.exc_info()):
+                            for line in record.splitlines():
+                                print('  ' + line, file=sys.stderr)
+                        print("\nRemainder of file ignored", file=sys.stderr)
+                        break
+            if reset:
+                known_paths = None
+            return known_paths
+        def addsitedir(sitedir, known_paths=None):
+            """Add 'sitedir' argument to sys.path if missing and handle .pth files in
+            'sitedir'"""
+            if known_paths is None:
+                known_paths = _init_pathinfo()
+                reset = True
+            else:
+                reset = False
+            sitedir, sitedircase = makepath(sitedir)
+            if not sitedircase in known_paths:
+                sys.path.append(sitedir)  # Add path component
+                known_paths.add(sitedircase)
+            try:
+                names = os.listdir(sitedir)
+            except OSError:
+                return
+            names = [name for name in names if name.endswith(".pth")]
+            for name in sorted(names):
+                addpackage(sitedir, name, known_paths)
+            if reset:
+                known_paths = None
+            return known_paths
+
+    addsitedir(site_packages)
 
     sys.real_prefix = sys.prefix
     sys.prefix = base
