@@ -3,7 +3,7 @@ import os
 import platform
 from pathlib import Path
 
-from appdirs import user_config_dir, site_config_dir, user_cache_dir
+from xicam.core.paths import user_dev_dir, user_plugin_dir, site_plugin_dir
 from yapsy import PluginInfo
 from yapsy.PluginManager import PluginManager
 
@@ -29,12 +29,7 @@ from timeit import default_timer
 from xicam.core import threads
 import time
 
-op_sys = platform.system()
-if op_sys == 'Darwin':  # User config dir incompatible with venv on darwin (space in path name conflicts)
-    user_plugin_dir = os.path.join(user_cache_dir(appname='xicam'), 'plugins')
-else:
-    user_plugin_dir = os.path.join(user_config_dir(appname='xicam'), 'plugins')
-site_plugin_dir = os.path.join(site_config_dir(appname='xicam'), 'plugins')
+
 
 qt_is_safe = False
 if 'qtpy' in sys.modules:
@@ -78,7 +73,8 @@ class XicamPluginManager(PluginManager):
 
         # Places to look for plugins
         self.plugindirs = [user_plugin_dir,
-                           site_plugin_dir] \
+                           site_plugin_dir,
+                           user_dev_dir] \
                           + list(xicam.__path__)
         self.setPluginPlaces(self.plugindirs)
         msg.logMessage('plugindirectories:', *self.plugindirs)
@@ -95,11 +91,6 @@ class XicamPluginManager(PluginManager):
     def notify(self, filter=None):
         for callback, obsfilter in self.observers:
             callback()
-
-
-    def loading_except_slot(self, ex):
-        msg.logError(ex)
-        raise NameError(f'No plugin named {name} is in the queue or plugin manager.')
 
     def getPluginByName(self, name, category="Default", timeout=150):
         plugin = super(XicamPluginManager, self).getPluginByName(name, category)
