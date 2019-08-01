@@ -79,7 +79,10 @@ class XicamPluginManager(PluginManager):
         # Places to look for plugins
         self.plugindirs = [user_plugin_dir,
                            site_plugin_dir] \
-                          + list(xicam.__path__)
+                           + list(xicam.__path__)
+        if getattr(sys,'frozen',False):
+            self.plugindirs.append(os.path.join(os.path.dirname(sys.argv[0]),'_plugins'))
+
         self.setPluginPlaces(self.plugindirs)
         msg.logMessage('plugindirectories:', *self.plugindirs)
 
@@ -150,7 +153,10 @@ class XicamPluginManager(PluginManager):
 
         Overloaded to add callback.
         """
-        self.setPluginPlaces(self.plugindirs + (paths or []))
+        dirs = self.plugindirs
+        if venvs.current_environment:
+            dirs.append(venvs.current_environment)
+        self.setPluginPlaces(dirs)
 
         self.locatePlugins()
 
@@ -205,7 +211,6 @@ class XicamPluginManager(PluginManager):
         msg.logMessage(f'Loading {name} from {plugininfo.path}')
 
     def venvChanged(self):
-        self.setPluginPlaces([venvs.current_environment])
         self.collectPlugins()
 
     def __getitem__(self, item: str):
@@ -241,6 +246,9 @@ class XicamPluginManager(PluginManager):
         self.loadqueue.extend(self._candidates)
 
         initial_len = len(self.loadqueue)
+
+        if not len(self.loadqueue):
+            return []
 
         for candidate_infofile, candidate_filepath, plugin_info in iter(self.loadqueue.popleft, (None, None, None)):
             # if a callback exists, call it before attempting to load

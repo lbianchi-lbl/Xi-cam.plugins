@@ -2,33 +2,47 @@ import collections
 import json
 from urllib import parse
 import os, sys
-
+import pkg_resources
 import requests
 import yaml
 from appdirs import user_config_dir, site_config_dir, user_cache_dir
 import platform
 import subprocess
 
-
-def pipmain(args):
-    subprocess.call([sys.executable, "-m", "pip", *args])
-
-
-# try:
-#     from pip._internal import main as pipmain
-# except ModuleNotFoundError:
-#     from pip import main as pipmain
-
 from . import manager
 from . import venvs
 
 
+def pipmain(args):
+    old_env = os.environ.copy()
+    os.environ["PYTHONPATH"] = os.path.join(venvs.current_environment, 'Lib/site-packages')
+    os.environ["PYTHONBASE"] = venvs.current_environment
+    old_prefix = sys.prefix
+    sys.prefix = venvs.current_environment
+
+    # Install the bundled software
+    import pip
+    try:
+        pip.main(args)
+    except AttributeError:
+        from pip._internal import main
+        main(args)
+
+    os.environ = old_env
+    sys.prefix = old_prefix
+
+    # subprocess.call([os.path.join(venvs.current_environment, 'Scripts/pip.exe'), *args], env=env)
+    # return 0  # Above subprocess typicall returns error code even though it succeeds
+
+
+
 op_sys = platform.system()
 if op_sys == 'Darwin':  # User config dir incompatible with venv on darwin (space in path name conflicts)
-    user_package_registry = os.path.join(user_cache_dir(appname='xicam'),'packages.yml')
+    user_package_registry = os.path.join(user_cache_dir(appname='xicam'), 'packages.yml')
 else:
-    user_package_registry = os.path.join(user_config_dir(appname='xicam'),'packages.yml')
-site_package_registry = os.path.join(site_config_dir(appname='xicam'),'packages.yml')
+    user_package_registry = os.path.join(user_config_dir(appname='xicam'), 'packages.yml')
+site_package_registry = os.path.join(site_config_dir(appname='xicam'), 'packages.yml')
+
 
 def install(name: str):
     """
@@ -56,9 +70,13 @@ def install(name: str):
 
     # Install from the uri
     if uri.scheme == 'pipgit':  # Clones a git repo and installs with pip
-        failure = pipmain(['install', f'--target={venvs.current_environment}', 'git+https://' + ''.join(uri[1:])])
+        failure = pipmain(['install',
+                           f'--target={os.path.join(venvs.current_environment,"Lib/site-packages")}',
+                           'git+https://' + ''.join(uri[1:])])
     elif uri.scheme == 'pip':
-        failure = pipmain(['install', f'--target={venvs.current_environment}', ''.join(uri[1:])])
+        failure = pipmain(['install',
+                           f'--target={os.path.join(venvs.current_environment,"Lib/site-packages")}',
+                           ''.join(uri[1:])])
     elif uri.scheme == 'conda':
         raise NotImplementedError
 
@@ -69,6 +87,9 @@ def install(name: str):
 
 
 def uninstall(name: str):
+    # Note: pkg_resources keeps a "working_set" that won't normally be updated when venv changes...
+    # An update may need to be forcefully triggered in the future
+    pkg_resources._initialize_master_working_set()
     failure = True
     if name in pkg_registry:
         scheme = pkg_registry[name]
@@ -84,6 +105,7 @@ def uninstall(name: str):
         del pkg_registry[name]
 
     return not failure
+
 
 class pkg_registry(collections.MutableMapping):
     def __init__(self):
