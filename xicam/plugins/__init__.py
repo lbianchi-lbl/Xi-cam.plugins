@@ -14,7 +14,7 @@ from .guiplugin import GUIPlugin, GUILayout
 from .processingplugin import ProcessingPlugin, EZProcessingPlugin, Input, Output, InOut, InputOutput
 from .settingsplugin import SettingsPlugin, ParameterSettingsPlugin
 from .dataresourceplugin import DataResourcePlugin
-from .controllerpugin import ControllerPlugin
+from .controllerplugin import ControllerPlugin
 from .widgetplugin import QWidgetPlugin
 from .venvs import observers as venvsobservers
 from .dataresourceplugin import DataResourcePlugin
