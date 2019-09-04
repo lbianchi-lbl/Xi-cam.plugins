@@ -98,14 +98,25 @@ class CatalogPlugin(Catalog, IPlugin):
     isSingleton = False
     name = ''
 
-    model = None
+    model = CatalogModel
     view = QListView
     controller = CatalogController
 
     def __init__(self, *args, **kwargs):
         super(CatalogPlugin, self).__init__()
-        self.model = CatalogModel(self)
+        self.setup()
 
+    def setup(self):
+        import inspect
+
+        if inspect.isclass(self.model):
+            self.model = self.model(self)
+
+        if inspect.isclass(self.view):
+            self.view.setModel(self.model)
+
+        if inspect.isclass(self.controller):
+            self.controller = self.controller(self.view)
 
 if __name__ == '__main__':
     from intake_bluesky.jsonl import BlueskyJSONLCatalog
