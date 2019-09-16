@@ -113,6 +113,7 @@ class CatalogPlugin(Catalog, IPlugin):
             self.model = self.model(self)
 
         if inspect.isclass(self.view):
+            self.view = self.view()
             self.view.setModel(self.model)
 
         if inspect.isclass(self.controller):
