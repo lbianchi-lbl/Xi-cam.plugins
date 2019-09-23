@@ -1,6 +1,7 @@
 import sys
 import os
 import platform
+import pkg_resources
 from pathlib import Path
 
 from appdirs import user_config_dir, site_config_dir, user_cache_dir
@@ -130,7 +131,7 @@ class XicamPluginManager(PluginManager):
                 if load_item[2].name == name:
                     self.loadqueue.remove(load_item)  # remove the item from the top-level queue
                     msg.logMessage(f"Immediately loading {load_item[2].name}.", level=msg.INFO)
-                    self.load_plugin(*load_item)  # and load it immediately
+                    self.load_marked_plugin(*load_item)  # and load it immediately
                     break
 
             # Run a wait loop until the plugin element is instanciated by main thread
@@ -257,7 +258,7 @@ class XicamPluginManager(PluginManager):
             # yield a message can be displayed to the user
             yield plugin_info
 
-            self.load_plugin(
+            self.load_marked_plugin(
                 candidate_infofile=candidate_infofile, candidate_filepath=candidate_filepath, plugin_info=plugin_info
             )
 
@@ -268,9 +269,20 @@ class XicamPluginManager(PluginManager):
         # Remove candidates list since we don't need them any more and
         # don't need to take up the space
         delattr(self, "_candidates")
+
+        # Load entry points
+        self.load_entry_point_plugins()
+
         return self.processed_plugins
 
-    def load_plugin(self, candidate_infofile, candidate_filepath, plugin_info):
+    def load_entry_point_plugins(self):
+        for category_name, plugins in self.category_mapping.items():
+            entry_point_plugins = [EntryPointPluginInfo(entry_point) for entry_point in
+                                   pkg_resources.iter_entry_points(f'xicam.plugins.{category_name}')]
+            for plugin_info in entry_point_plugins:
+                threads.invoke_in_main_thread(self.instanciatePlugin, plugin_info, plugin_info.plugin_object)
+
+    def load_marked_plugin(self, candidate_infofile, candidate_filepath, plugin_info):
         msg.logMessage(
             f'Loading {plugin_info.name} plugin in {"main" if threads.is_main_thread() else "background"} thread.',
             level=msg.INFO,
@@ -384,6 +396,12 @@ class XicamPluginManager(PluginManager):
                         self._category_file_mapping[current_category].append(candidate_infofile)
 
                         return True
+
+
+class EntryPointPluginInfo():
+    def __init__(self, entry_point):
+        self.plugin_object = entry_point.load()
+        self.name = entry_point.name
 
 
 # Setup plugin manager
