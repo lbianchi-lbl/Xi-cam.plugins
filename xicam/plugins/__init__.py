@@ -186,7 +186,7 @@ class XicamPluginManager(PluginManager):
 
         self.notify()
 
-    def instanciatePlugin(self, plugin_info, element):
+    def instanciatePlugin(self, plugin_info, element, category_name):
         """
         The default behavior is that each plugin is instanciated at load time; the class is thrown away.
         Add the isSingleton = False attribute to your plugin class to prevent this behavior!
@@ -207,6 +207,9 @@ class XicamPluginManager(PluginManager):
                     repr(ex), title=f'An error occurred while starting the "{plugin_info.name}" plugin.', level=msg.CRITICAL
                 )
                 plugin_info.error = exc_info
+            else:
+                plugin_info.categories.append(category_name)
+                self.category_mapping[category_name].append(plugin_info)
 
         msg.logMessage(f"{int(elapsed()*1000)} ms elapsed while instanciating {plugin_info.name}", level=msg.INFO)
 
@@ -280,7 +283,7 @@ class XicamPluginManager(PluginManager):
             entry_point_plugins = [EntryPointPluginInfo(entry_point) for entry_point in
                                    pkg_resources.iter_entry_points(f'xicam.plugins.{category_name}')]
             for plugin_info in entry_point_plugins:
-                threads.invoke_in_main_thread(self.instanciatePlugin, plugin_info, plugin_info.plugin_object)
+                self.load_element_entry_point(category_name, plugin_info)
 
     def load_marked_plugin(self, candidate_infofile, candidate_filepath, plugin_info):
         msg.logMessage(
@@ -354,6 +357,44 @@ class XicamPluginManager(PluginManager):
             else:
                 msg.logMessage(f"No plugin found in indicated module: {candidate_filepath}", msg.ERROR)
 
+    def load_element_entry_point(self, category_name, plugin_info):
+        """
+
+        Parameters
+        ----------
+        element
+        candidate_infofile
+        plugin_info
+
+        Returns
+        -------
+        bool
+            True if the element matched a category, and will be accepted as a plugin
+
+        """
+        target_plugin_info = None
+
+        element = plugin_info.plugin_object
+
+        if element is not self.categories_interfaces[category_name]:
+            # we found a new plugin: initialise it and search for the next one
+            try:
+
+                threads.invoke_in_main_thread(self.instanciatePlugin, plugin_info, element, category_name)
+
+            except Exception as ex:
+                exc_info = sys.exc_info()
+                msg.logError(ex)
+                msg.logMessage("Unable to create plugin object: %s" % plugin_info.path)
+                plugin_info.error = exc_info
+                # break  # If it didn't work once it wont again
+                msg.logError(RuntimeError("An error occurred while loading plugin: %s" % plugin_info.path))
+            else:
+                # plugin_info.categories.append(category_name)
+                # self.category_mapping[category_name].append(plugin_info)
+
+                return True
+
     def load_element(self, element, candidate_infofile, plugin_info):
         """
 
@@ -381,7 +422,7 @@ class XicamPluginManager(PluginManager):
                     # we found a new plugin: initialise it and search for the next one
                     try:
 
-                        threads.invoke_in_main_thread(self.instanciatePlugin, plugin_info, element)
+                        threads.invoke_in_main_thread(self.instanciatePlugin, plugin_info, element, current_category)
 
                     except Exception as ex:
                         exc_info = sys.exc_info()
@@ -391,8 +432,8 @@ class XicamPluginManager(PluginManager):
                         # break  # If it didn't work once it wont again
                         msg.logError(RuntimeError("An error occurred while loading plugin: %s" % plugin_info.path))
                     else:
-                        plugin_info.categories.append(current_category)
-                        self.category_mapping[current_category].append(plugin_info)
+                        # plugin_info.categories.append(current_category)
+                        # self.category_mapping[current_category].append(plugin_info)
                         self._category_file_mapping[current_category].append(candidate_infofile)
 
                         return True
@@ -402,6 +443,7 @@ class EntryPointPluginInfo():
     def __init__(self, entry_point):
         self.plugin_object = entry_point.load()
         self.name = entry_point.name
+        self.categories = []
 
 
 # Setup plugin manager
