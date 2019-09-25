@@ -153,11 +153,6 @@ class XicamPluginManager(PluginManager):
         return plugin
 
     def getPluginsOfCategory(self, category_name):
-        while not self.loadcomplete:
-            if threads.is_main_thread():
-                QApplication.processEvents()
-            else:
-                time.sleep(0.01)
         plugins = super(XicamPluginManager, self).getPluginsOfCategory(category_name)
         return [plugin for plugin in plugins if plugin.plugin_object]
 
