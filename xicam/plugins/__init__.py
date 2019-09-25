@@ -2,13 +2,18 @@ import sys
 import os
 import platform
 import pkg_resources
-from pathlib import Path
+import itertools
+import warnings
 
+import entrypoints
 from appdirs import user_config_dir, site_config_dir, user_cache_dir
 from yapsy import PluginInfo
 from yapsy.PluginManager import PluginManager
 
+import xicam
 from xicam.core import msg
+from xicam.core import threads
+
 from .datahandlerplugin import DataHandlerPlugin
 from .catalogplugin import CatalogPlugin
 from .guiplugin import GUIPlugin, GUILayout
@@ -22,13 +27,13 @@ from .dataresourceplugin import DataResourcePlugin
 from .fittablemodelplugin import Fittable1DModelPlugin
 from .ezplugin import _EZPlugin, EZPlugin
 from .hints import PlotHint, Hint
+
 from yapsy.PluginManager import NormalizePluginNameForModuleName, imp, log
-import xicam
 import importlib.util
 from collections import deque
 from contextlib import contextmanager
 from timeit import default_timer
-from xicam.core import threads
+
 import time
 
 op_sys = platform.system()
@@ -280,8 +285,22 @@ class XicamPluginManager(PluginManager):
 
     def load_entry_point_plugins(self):
         for category_name, plugins in self.category_mapping.items():
-            entry_point_plugins = [EntryPointPluginInfo(entry_point) for entry_point in
-                                   pkg_resources.iter_entry_points(f'xicam.plugins.{category_name}')]
+            group = entrypoints.get_group_named(f'xicam.plugins.{category_name}')
+            group_all = entrypoints.get_group_all(f'xicam.plugins.{category_name}')
+
+            # Warn the user if entrypoint names may shadow each other
+            if len(group_all) != len(group):
+                # There are some name collisions. Let's go digging for them.
+                for name, matches in itertools.groupby(group_all, lambda ep: ep.name):
+                    matches = list(matches)
+                    if len(matches) != 1:
+                        winner = group[name]
+                        warnings.warn(
+                            f"There are {len(matches)} entrypoints which share the name {name!r}: {matches}. "
+                            f"This may cause shadowing or other unexpected behavior in the future. "
+                            f"It is suggested to rename one of these entrypoints.")
+
+            entry_point_plugins = [EntryPointPluginInfo(entry_point) for entry_point in group_all]
             for plugin_info in entry_point_plugins:
                 self.load_element_entry_point(category_name, plugin_info)
 
