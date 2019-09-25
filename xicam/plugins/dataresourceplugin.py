@@ -41,7 +41,7 @@ except ImportError:
 
 class DataResourcePlugin(IPlugin):
     from xicam.gui.widgets.dataresourcebrowser import DataResourceList, DataBrowser
-  
+
     model = DataSourceListModel
     view = DataResourceList
     controller = DataBrowser
