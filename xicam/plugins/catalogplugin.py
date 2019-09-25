@@ -68,11 +68,13 @@ class CatalogModel(QAbstractItemModel):
 
 class CatalogController(QWidget):
     sigOpen = Signal(SafeLocalCatalogEntry)
+    # TODO: Make sure these are emitted / connected
     sigPreview = Signal(SafeLocalCatalogEntry)
 
-    # Not sure about these signals
+   
     sigOpenPath = Signal(str)
     sigOpenExternally = Signal(str)
+    # TODO: Emit original / new str
     sigLocationChanged = Signal()
 
     def __init__(self, view, parent=None):
