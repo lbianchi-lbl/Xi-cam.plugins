@@ -250,6 +250,10 @@ class ProcessingPlugin(IPlugin):
             self._param.sigValueChanged.connect(self.setParameterValue)
         return self._param
 
+    @staticmethod
+    def getCategory() -> str:
+        return "default"
+
     def setParameterValue(self, name, param, value):
         """
         Sets the `name` parameter's value to the passed value.
