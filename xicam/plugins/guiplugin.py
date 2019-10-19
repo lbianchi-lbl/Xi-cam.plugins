@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Dict, List, Union
 from xicam.core.data import NonDBHeader
 from qtpy.QtGui import *
-from databroker.core import BlueskyRun
+from intake_bluesky.core import BlueskyRun
 
 from yapsy.IPlugin import IPlugin
 
